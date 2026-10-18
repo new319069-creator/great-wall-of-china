@@ -1,0 +1,2567 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>The Great Wall of China — 万里长城 Photorealistic 3D Experience</title>
+  <style>
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+      user-select: none;
+    }
+    body, html {
+      width: 100%;
+      height: 100%;
+      overflow: hidden;
+      background-color: #080c14;
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "PingFang SC", "Hiragino Sans GB", "Microsoft YaHei", sans-serif;
+      color: #f1f3f7;
+    }
+    #webgl-canvas {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 1;
+      display: block;
+    }
+
+    /* Cinematic Letterbox */
+    .letterbox-top, .letterbox-bottom {
+      position: absolute;
+      left: 0;
+      width: 100%;
+      height: 0px;
+      background: #000;
+      z-index: 5;
+      transition: height 0.6s cubic-bezier(0.16, 1, 0.3, 1);
+      pointer-events: none;
+    }
+    .letterbox-top { top: 0; }
+    .letterbox-bottom { bottom: 0; }
+    body.cinematic .letterbox-top, body.cinematic .letterbox-bottom {
+      height: 52px;
+    }
+
+    /* HUD overlay */
+    #hud {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      z-index: 10;
+      pointer-events: none;
+      display: flex;
+      flex-direction: column;
+      justify-content: space-between;
+      padding: 24px;
+    }
+
+    .interactive {
+      pointer-events: auto;
+    }
+
+    /* Top Bar */
+    .top-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      gap: 16px;
+    }
+    .title-card {
+      background: rgba(12, 18, 28, 0.78);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      padding: 16px 22px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.5);
+      max-width: 440px;
+    }
+    .seal-badge {
+      display: inline-block;
+      width: 30px;
+      height: 30px;
+      background: #b71c1c;
+      color: #fff;
+      font-size: 15px;
+      line-height: 30px;
+      text-align: center;
+      border-radius: 4px;
+      font-weight: 700;
+      margin-right: 8px;
+      box-shadow: 0 2px 10px rgba(183, 28, 28, 0.7);
+      vertical-align: middle;
+      font-family: "Songti SC", "SimSun", serif;
+    }
+    .title-card h1 {
+      font-size: 20px;
+      font-weight: 700;
+      display: inline-block;
+      vertical-align: middle;
+      letter-spacing: 0.5px;
+      color: #ffffff;
+    }
+    .title-card .subtext {
+      margin-top: 6px;
+      font-size: 12px;
+      color: #9cb1c9;
+      line-height: 1.5;
+    }
+
+    /* Quick status pill */
+    .status-badge {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      background: rgba(12, 18, 28, 0.75);
+      backdrop-filter: blur(14px);
+      padding: 8px 16px;
+      border-radius: 30px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      font-size: 12px;
+      color: #d1d8e0;
+    }
+    .beacon-dot {
+      width: 9px;
+      height: 9px;
+      border-radius: 50%;
+      background: #4ade80;
+      box-shadow: 0 0 10px #4ade80;
+      transition: all 0.3s ease;
+    }
+    .beacon-dot.active {
+      background: #ff5722;
+      box-shadow: 0 0 16px #ff5722;
+      animation: pulse 1.2s infinite;
+    }
+    @keyframes pulse {
+      0% { opacity: 0.6; transform: scale(0.9); }
+      50% { opacity: 1; transform: scale(1.25); }
+      100% { opacity: 0.6; transform: scale(0.9); }
+    }
+
+    /* Bottom Control Dashboard */
+    .bottom-bar {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-end;
+      gap: 20px;
+    }
+
+    .controls-panel {
+      background: rgba(12, 18, 28, 0.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      padding: 16px 20px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.14);
+      box-shadow: 0 18px 45px rgba(0, 0, 0, 0.55);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+      max-width: 620px;
+    }
+
+    .button-group {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+      align-items: center;
+    }
+    .btn {
+      background: rgba(255, 255, 255, 0.08);
+      color: #f1f3f7;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      padding: 7px 13px;
+      border-radius: 8px;
+      font-size: 12px;
+      font-weight: 500;
+      cursor: pointer;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s cubic-bezier(0.16, 1, 0.3, 1);
+    }
+    .btn:hover {
+      background: rgba(255, 255, 255, 0.18);
+      border-color: rgba(255, 255, 255, 0.3);
+      transform: translateY(-1px);
+    }
+    .btn.active {
+      background: #e65100;
+      color: #ffffff;
+      border-color: #ff9800;
+      box-shadow: 0 4px 14px rgba(230, 81, 0, 0.45);
+    }
+    .btn-fire {
+      background: #b71c1c;
+      border-color: #f44336;
+      color: #fff;
+      font-weight: 600;
+    }
+    .btn-fire:hover {
+      background: #d32f2f;
+      box-shadow: 0 4px 16px rgba(244, 67, 54, 0.5);
+    }
+    .btn-fire.ignited {
+      background: linear-gradient(135deg, #e65100, #ff9800);
+      border-color: #ffb74d;
+      box-shadow: 0 0 18px rgba(255, 152, 0, 0.6);
+    }
+
+    .section-label {
+      font-size: 11px;
+      text-transform: uppercase;
+      letter-spacing: 0.8px;
+      color: #8da4be;
+      margin-bottom: 2px;
+    }
+
+    /* Telemetry / Mini Profile Card */
+    .mini-card {
+      background: rgba(12, 18, 28, 0.78);
+      backdrop-filter: blur(16px);
+      padding: 14px 18px;
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.12);
+      box-shadow: 0 16px 36px rgba(0, 0, 0, 0.45);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      min-width: 230px;
+    }
+    .telemetry-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 11px;
+      color: #9cb1c9;
+    }
+    .telemetry-val {
+      font-weight: 600;
+      color: #fff;
+    }
+    .progress-bar-bg {
+      width: 100%;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+      overflow: hidden;
+      position: relative;
+    }
+    .progress-bar-fill {
+      position: absolute;
+      left: 0;
+      top: 0;
+      height: 100%;
+      width: 35%;
+      background: #ff9800;
+      transition: width 0.2s linear;
+    }
+    .fps-tag {
+      font-size: 11px;
+      color: #64748b;
+      font-family: monospace;
+    }
+
+    /* First Person Reticle */
+    #reticle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      transform: translate(-50%, -50%);
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.85);
+      box-shadow: 0 0 6px rgba(0, 0, 0, 0.8);
+      pointer-events: none;
+      z-index: 20;
+      display: none;
+    }
+    #walk-hint {
+      position: absolute;
+      bottom: 110px;
+      left: 50%;
+      transform: translateX(-50%);
+      background: rgba(10, 16, 26, 0.85);
+      backdrop-filter: blur(12px);
+      padding: 8px 18px;
+      border-radius: 20px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      font-size: 12px;
+      color: #e2e8f0;
+      pointer-events: none;
+      z-index: 15;
+      display: none;
+      text-align: center;
+    }
+
+    /* Historical POI tooltip */
+    #poi-card {
+      position: absolute;
+      top: 85px;
+      right: 24px;
+      width: 340px;
+      background: rgba(12, 18, 28, 0.88);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+      border-radius: 12px;
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      box-shadow: 0 20px 48px rgba(0, 0, 0, 0.65);
+      padding: 16px 20px;
+      z-index: 25;
+      pointer-events: auto;
+      transform: translateY(-8px);
+      opacity: 0;
+      transition: all 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+      display: none;
+    }
+    #poi-card.visible {
+      transform: translateY(0);
+      opacity: 1;
+      display: block;
+    }
+    #poi-card h3 {
+      font-size: 15px;
+      color: #ffb74d;
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    #poi-card p {
+      font-size: 12px;
+      color: #cbd5e1;
+      line-height: 1.55;
+    }
+    .poi-close {
+      position: absolute;
+      top: 10px;
+      right: 12px;
+      background: transparent;
+      border: none;
+      color: #94a3b8;
+      font-size: 16px;
+      cursor: pointer;
+    }
+    .poi-close:hover { color: #fff; }
+
+    /* Loading screen */
+    #loader {
+      position: fixed;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100%;
+      background: radial-gradient(circle at center, #141c2b 0%, #060910 100%);
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      align-items: center;
+      z-index: 100;
+      color: #fff;
+      transition: opacity 0.8s ease, visibility 0.8s;
+    }
+    #loader.hidden {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+    .loader-seal {
+      width: 68px;
+      height: 68px;
+      background: #b71c1c;
+      color: #fff;
+      font-size: 34px;
+      line-height: 68px;
+      text-align: center;
+      border-radius: 8px;
+      font-weight: bold;
+      font-family: "Songti SC", "SimSun", serif;
+      box-shadow: 0 4px 22px rgba(183, 28, 28, 0.8);
+      margin-bottom: 20px;
+      animation: sealGlow 2s infinite alternate ease-in-out;
+    }
+    @keyframes sealGlow {
+      from { box-shadow: 0 4px 15px rgba(183, 28, 28, 0.5); transform: scale(0.97); }
+      to { box-shadow: 0 8px 32px rgba(255, 87, 34, 0.85); transform: scale(1.03); }
+    }
+    .loader-title {
+      font-size: 24px;
+      letter-spacing: 2px;
+      font-weight: 700;
+      margin-bottom: 8px;
+    }
+    .loader-subtitle {
+      font-size: 13px;
+      color: #94a3b8;
+      letter-spacing: 1px;
+      margin-bottom: 24px;
+    }
+    .loader-bar-wrap {
+      width: 280px;
+      height: 4px;
+      background: rgba(255, 255, 255, 0.12);
+      border-radius: 2px;
+      overflow: hidden;
+    }
+    .loader-bar-inner {
+      width: 0%;
+      height: 100%;
+      background: linear-gradient(90deg, #ff5722, #ffb300);
+      transition: width 0.3s ease;
+    }
+    .loader-status {
+      font-size: 11px;
+      color: #64748b;
+      margin-top: 10px;
+    }
+
+    @media (max-width: 768px) {
+      #hud { padding: 12px; }
+      .title-card { max-width: 100%; }
+      .bottom-bar { flex-direction: column; align-items: stretch; }
+      .mini-card { display: none; }
+      .controls-panel { max-width: 100%; }
+    }
+  </style>
+  <!-- Three.js + OrbitControls -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+  <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+</head>
+<body>
+  <div class="letterbox-top"></div>
+  <div class="letterbox-bottom"></div>
+
+  <!-- Loading Screen -->
+  <div id="loader">
+    <div class="loader-seal">长城</div>
+    <div class="loader-title">THE GREAT WALL OF CHINA</div>
+    <div class="loader-subtitle">Photorealistic Yan Mountains & Ming Dynasty Architecture</div>
+    <div class="loader-bar-wrap">
+      <div id="loader-progress" class="loader-bar-inner"></div>
+    </div>
+    <div id="loader-msg" class="loader-status">Synthesizing PBR stone normal maps and mountain crags...</div>
+  </div>
+
+  <canvas id="webgl-canvas"></canvas>
+
+  <div id="reticle"></div>
+  <div id="walk-hint">WASD / Arrow Keys to walk along the ramparts • Mouse to look around • SPACE to step up • SHIFT to sprint</div>
+
+  <!-- Historical POI Card -->
+  <div id="poi-card" class="interactive">
+    <button class="poi-close" id="poi-close-btn">&times;</button>
+    <h3 id="poi-title">Jiankou Eagle-Claw Watchtower</h3>
+    <p id="poi-desc">Perched directly atop knife-edge dolomite crags at 980 meters altitude. Built using white-gray granite ashlar foundation slabs and kiln-fired blue-gray Ming bricks (青砖) bonded with lime mortar. Exterior battlements feature arrow loops and water gargoyles (透水) channeled through solid stone.</p>
+  </div>
+
+  <div id="hud">
+    <!-- Top Bar -->
+    <div class="top-bar">
+      <div class="title-card interactive">
+        <span class="seal-badge">明</span>
+        <h1>The Great Wall of China</h1>
+        <div class="subtext">
+          Photorealistic 3D simulation of the rugged Jiankou & Mutianyu wild wall. Featuring procedural PBR normal-mapped granite and kiln bricks, sheer karst precipices, true stone stairs, drainage gargoyles, and an interconnected beacon signal network.
+        </div>
+      </div>
+
+      <div class="status-badge interactive">
+        <div id="beacon-indicator" class="beacon-dot"></div>
+        <span id="beacon-status-text">Beacon Network: Standing Watch</span>
+        <button id="sound-btn" class="btn" style="padding: 4px 8px; margin-left: 8px;">🔊 Sound: On</button>
+      </div>
+    </div>
+
+    <!-- Bottom Bar -->
+    <div class="bottom-bar">
+      <div class="controls-panel interactive">
+        <div>
+          <div class="section-label">Camera Modes</div>
+          <div class="button-group">
+            <button class="btn active" id="btn-cam-orbit">🛰️ Aerial Drone</button>
+            <button class="btn" id="btn-cam-walk">🚶 Walk Ramparts</button>
+            <button class="btn" id="btn-cam-tour">🎬 Cinematic Tour</button>
+            <button class="btn btn-fire" id="btn-beacon-fire">🔥 Light Beacon Fires</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">Atmosphere & Time of Day</div>
+          <div class="button-group">
+            <button class="btn active" id="btn-tod-sunset">🌇 Golden Sunset</button>
+            <button class="btn" id="btn-tod-noon">☀️ Crisp Midday</button>
+            <button class="btn" id="btn-tod-mist">🌫️ Mountain Mist</button>
+            <button class="btn" id="btn-tod-night">🌙 Moonlit Dynasty</button>
+          </div>
+        </div>
+
+        <div>
+          <div class="section-label">Seasonal Foliage Biome</div>
+          <div class="button-group">
+            <button class="btn active" id="btn-season-autumn">🍁 Golden Autumn (Jiankou)</button>
+            <button class="btn" id="btn-season-summer">🌲 Summer Pine Forest</button>
+            <button class="btn" id="btn-season-spring">🌸 Spring Mountain Blossom</button>
+            <button class="btn" id="btn-season-winter">❄️ Winter Frost & Snow</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mini-card interactive">
+        <div class="telemetry-row">
+          <span>Terrain Sector</span>
+          <span class="telemetry-val">Jiankou Knife-Edge (箭扣)</span>
+        </div>
+        <div class="telemetry-row">
+          <span>Altitude Range</span>
+          <span class="telemetry-val">520m – 1,180m</span>
+        </div>
+        <div class="telemetry-row">
+          <span>Watchtowers</span>
+          <span class="telemetry-val" id="telemetry-towers">7 Sentry Posts Active</span>
+        </div>
+        <div class="progress-bar-bg">
+          <div id="wall-tour-progress" class="progress-bar-fill"></div>
+        </div>
+        <div class="telemetry-row">
+          <span>Wall Traversal</span>
+          <span id="progress-percent" class="telemetry-val">35%</span>
+        </div>
+        <div class="fps-tag" id="fps-display">60 FPS • PBR Normal Maps</div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    /* ==========================================================================
+       FAST MULTI-OCTAVE PERLIN NOISE & DOMAIN WARPING ENGINE
+       Provides sharp geological karst crests, sheer cliffs, and jagged erosion.
+       ========================================================================== */
+    class FastNoise {
+      constructor(seed = 42819) {
+        this.p = new Uint8Array(512);
+        const permutation = [
+          151,160,137,91,90,15,131,13,201,95,96,53,194,233,7,225,140,36,103,30,69,142,
+          8,99,37,240,21,10,23,190,6,148,247,120,234,75,0,26,197,62,94,252,219,203,117,
+          35,11,32,57,177,33,88,237,149,56,87,174,20,125,136,171,168,68,175,74,165,71,
+          134,139,48,27,166,77,146,158,231,83,111,229,122,60,211,133,230,220,105,92,41,
+          55,46,245,40,244,102,143,54,65,25,63,161,1,216,80,73,209,76,132,187,208,89,
+          18,169,200,196,135,130,116,188,159,86,164,100,109,198,173,186,3,64,52,217,226,
+          250,124,123,5,202,38,147,118,126,255,82,85,212,207,206,59,227,47,16,58,17,182,
+          189,28,42,223,183,170,213,119,248,152,2,44,154,163,70,221,153,101,155,167,43,
+          172,9,129,22,39,253,19,98,108,110,79,113,224,232,178,185,112,104,218,246,97,
+          228,251,34,242,193,238,210,144,12,191,179,162,241,81,51,145,235,249,14,239,
+          107,49,192,214,31,181,199,106,157,184,84,204,176,115,121,50,45,127,4,150,254,
+          138,236,205,93,222,114,67,29,24,72,243,141,128,195,78,66,215,61,156,180
+        ];
+        for (let i = 0; i < 256; i++) {
+          const val = permutation[(i + (seed & 0xFF)) % 256];
+          this.p[i] = val;
+          this.p[256 + i] = val;
+        }
+      }
+
+      fade(t) { return t * t * t * (t * (t * 6 - 15) + 10); }
+      lerp(t, a, b) { return a + t * (b - a); }
+      grad(hash, x, y, z) {
+        const h = hash & 15;
+        const u = h < 8 ? x : y;
+        const v = h < 4 ? y : h === 12 || h === 14 ? x : z;
+        return ((h & 1) === 0 ? u : -u) + ((h & 2) === 0 ? v : -v);
+      }
+
+      noise2D(x, y) {
+        return this.noise3D(x, y, 0.5);
+      }
+
+      noise3D(x, y, z) {
+        const X = Math.floor(x) & 255;
+        const Y = Math.floor(y) & 255;
+        const Z = Math.floor(z) & 255;
+
+        x -= Math.floor(x);
+        y -= Math.floor(y);
+        z -= Math.floor(z);
+
+        const u = this.fade(x);
+        const v = this.fade(y);
+        const w = this.fade(z);
+
+        const A = this.p[X] + Y, AA = this.p[A] + Z, AB = this.p[A + 1] + Z;
+        const B = this.p[X + 1] + Y, BA = this.p[B] + Z, BB = this.p[B + 1] + Z;
+
+        return this.lerp(w,
+          this.lerp(v,
+            this.lerp(u, this.grad(this.p[AA], x, y, z), this.grad(this.p[BA], x - 1, y, z)),
+            this.lerp(u, this.grad(this.p[AB], x, y - 1, z), this.grad(this.p[BB], x - 1, y - 1, z))
+          ),
+          this.lerp(v,
+            this.lerp(u, this.grad(this.p[AA + 1], x, y, z - 1), this.grad(this.p[BA + 1], x - 1, y, z - 1)),
+            this.lerp(u, this.grad(this.p[AB + 1], x, y - 1, z - 1), this.grad(this.p[BB + 1], x - 1, y - 1, z - 1))
+          )
+        );
+      }
+
+      fbm(x, y, octaves = 5, persistence = 0.5, lacunarity = 2.0) {
+        let total = 0;
+        let frequency = 1;
+        let amplitude = 1;
+        let maxValue = 0;
+        for (let i = 0; i < octaves; i++) {
+          total += this.noise2D(x * frequency, y * frequency) * amplitude;
+          maxValue += amplitude;
+          amplitude *= persistence;
+          frequency *= lacunarity;
+        }
+        return total / maxValue;
+      }
+
+      // Domain warped noise for geological rock strata
+      warpedFbm(x, y) {
+        const qx = this.fbm(x + 0.0, y + 0.0, 4);
+        const qy = this.fbm(x + 5.2, y + 1.3, 4);
+        return this.fbm(x + 4.0 * qx, y + 4.0 * qy, 5);
+      }
+    }
+
+    /* ==========================================================================
+       SYNTHESIZED AUDIO ENGINE (Web Audio API)
+       Mountain wind, fire crackling, gong echoes, and stone footsteps.
+       ========================================================================== */
+    class AudioSystem {
+      constructor() {
+        this.ctx = null;
+        this.windGain = null;
+        this.fireGain = null;
+        this.isMuted = false;
+        this.initialized = false;
+      }
+
+      init() {
+        if (this.initialized) return;
+        try {
+          const AudioContext = window.AudioContext || window.webkitAudioContext;
+          this.ctx = new AudioContext();
+
+          // Mountain Wind (Filtered Pink Noise with resonant sweep)
+          const bufferSize = this.ctx.sampleRate * 2;
+          const noiseBuffer = this.ctx.createBuffer(1, bufferSize, this.ctx.sampleRate);
+          const output = noiseBuffer.getChannelData(0);
+          let b0 = 0, b1 = 0, b2 = 0, b3 = 0, b4 = 0, b5 = 0, b6 = 0;
+          for (let i = 0; i < bufferSize; i++) {
+            const white = Math.random() * 2 - 1;
+            b0 = 0.99886 * b0 + white * 0.0555179;
+            b1 = 0.99332 * b1 + white * 0.0750759;
+            b2 = 0.96900 * b2 + white * 0.1538520;
+            b3 = 0.86650 * b3 + white * 0.3104856;
+            b4 = 0.55000 * b4 + white * 0.5329522;
+            b5 = -0.7616 * b5 - white * 0.0168980;
+            output[i] = (b0 + b1 + b2 + b3 + b4 + b5 + b6 + white * 0.5362) * 0.08;
+            b6 = white * 0.115926;
+          }
+
+          const whiteNoise = this.ctx.createBufferSource();
+          whiteNoise.buffer = noiseBuffer;
+          whiteNoise.loop = true;
+
+          const filter = this.ctx.createBiquadFilter();
+          filter.type = 'lowpass';
+          filter.frequency.setValueAtTime(360, this.ctx.currentTime);
+
+          const lfo = this.ctx.createOscillator();
+          lfo.frequency.setValueAtTime(0.1, this.ctx.currentTime);
+          const lfoGain = this.ctx.createGain();
+          lfoGain.gain.setValueAtTime(120, this.ctx.currentTime);
+          lfo.connect(lfoGain);
+          lfoGain.connect(filter.frequency);
+          lfo.start();
+
+          this.windGain = this.ctx.createGain();
+          this.windGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+
+          whiteNoise.connect(filter);
+          filter.connect(this.windGain);
+          this.windGain.connect(this.ctx.destination);
+          whiteNoise.start();
+
+          // Fire Crackle Bus
+          this.fireGain = this.ctx.createGain();
+          this.fireGain.gain.setValueAtTime(0.0, this.ctx.currentTime);
+          this.fireGain.connect(this.ctx.destination);
+
+          this.initialized = true;
+        } catch (e) {
+          console.warn('Web Audio pending interaction', e);
+        }
+      }
+
+      setFireVolume(vol) {
+        if (!this.initialized || !this.fireGain) return;
+        this.fireGain.gain.setTargetAtTime(this.isMuted ? 0 : vol, this.ctx.currentTime, 0.4);
+      }
+
+      playGong(pitch = 180) {
+        if (!this.initialized || this.isMuted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'sine';
+        osc.frequency.setValueAtTime(pitch, now);
+        osc.frequency.exponentialRampToValueAtTime(pitch * 0.96, now + 3.2);
+
+        gain.gain.setValueAtTime(0.32, now);
+        gain.gain.exponentialRampToValueAtTime(0.0001, now + 3.8);
+
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 4.0);
+      }
+
+      playStep() {
+        if (!this.initialized || this.isMuted) return;
+        const now = this.ctx.currentTime;
+        const osc = this.ctx.createOscillator();
+        const gain = this.ctx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.setValueAtTime(80 + Math.random() * 30, now);
+        gain.gain.setValueAtTime(0.05, now);
+        gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12);
+        osc.connect(gain);
+        gain.connect(this.ctx.destination);
+        osc.start(now);
+        osc.stop(now + 0.14);
+      }
+
+      toggleMute() {
+        this.isMuted = !this.isMuted;
+        if (!this.initialized) {
+          this.init();
+          return this.isMuted;
+        }
+        if (this.isMuted) {
+          this.windGain.gain.setValueAtTime(0, this.ctx.currentTime);
+          this.fireGain.gain.setValueAtTime(0, this.ctx.currentTime);
+        } else {
+          this.windGain.gain.setValueAtTime(0.2, this.ctx.currentTime);
+        }
+        return this.isMuted;
+      }
+    }
+
+    /* ==========================================================================
+       PBR TEXTURE SYNTHESIZER (Sobel Normal Maps, Roughness & AO)
+       Renders authentic Ming kiln-fired bricks (青砖), chiselled granite ashlars,
+       flagstones with worn pedestrian paths, and stratified limestone rock cliffs.
+       ========================================================================== */
+    class TextureSynthesizer {
+      // Computes a tangent-space normal map from a grayscale height buffer using a 3x3 Sobel kernel
+      static generateNormalMap(heightData, width, height, strength = 2.5) {
+        const canvas = document.createElement('canvas');
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        const imgData = ctx.createImageData(width, height);
+        const data = imgData.data;
+
+        const getH = (x, y) => {
+          const wrapX = (x + width) % width;
+          const wrapY = (y + height) % height;
+          return heightData[wrapY * width + wrapX];
+        };
+
+        for (let y = 0; y < height; y++) {
+          for (let x = 0; x < width; x++) {
+            // Sobel gradients
+            const dX = (
+              -1 * getH(x-1, y-1) + 1 * getH(x+1, y-1) +
+              -2 * getH(x-1, y)   + 2 * getH(x+1, y) +
+              -1 * getH(x-1, y+1) + 1 * getH(x+1, y+1)
+            ) * strength;
+
+            const dY = (
+              -1 * getH(x-1, y-1) - 2 * getH(x, y-1) - 1 * getH(x+1, y-1) +
+               1 * getH(x-1, y+1) + 2 * getH(x, y+1) + 1 * getH(x+1, y+1)
+            ) * strength;
+
+            const dZ = 1.0;
+            const len = Math.sqrt(dX * dX + dY * dY + dZ * dZ);
+            const nx = dX / len;
+            const ny = dY / len;
+            const nz = dZ / len;
+
+            const idx = (y * width + x) * 4;
+            data[idx]     = Math.floor((nx * 0.5 + 0.5) * 255); // R = Tangent X
+            data[idx + 1] = Math.floor((ny * 0.5 + 0.5) * 255); // G = Tangent Y
+            data[idx + 2] = Math.floor((nz * 0.5 + 0.5) * 255); // B = Tangent Z
+            data[idx + 3] = 255;
+          }
+        }
+        ctx.putImageData(imgData, 0, 0);
+        const tex = new THREE.CanvasTexture(canvas);
+        tex.wrapS = THREE.RepeatWrapping;
+        tex.wrapT = THREE.RepeatWrapping;
+        return tex;
+      }
+
+      // Ming Dynasty Kiln-Fired Gray Bricks (青砖 / Blue-gray bricks with lime mortar)
+      static createMingBrickPBR() {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const cCtx = colorCanvas.getContext('2d');
+
+        const heightData = new Float32Array(size * size);
+        const rows = 20;
+        const rowH = size / rows;
+        const cols = 8;
+        const colW = size / cols;
+
+        // Base mortar color
+        cCtx.fillStyle = '#615f5c';
+        cCtx.fillRect(0, 0, size, size);
+
+        for (let r = 0; r < rows; r++) {
+          const isOffset = (r % 2 === 1);
+          const offset = isOffset ? colW / 2 : 0;
+
+          for (let c = -1; c <= cols + 1; c++) {
+            const bx = c * colW + offset;
+            const by = r * rowH;
+
+            // Ming Dynasty blue-gray kiln brick hues: slate gray with subtle mineral variation
+            const tone = 90 + Math.floor(Math.sin(r * 3.7 + c * 2.1) * 18) + (Math.random() * 12 - 6);
+            const rC = Math.floor(tone * 0.94);
+            const gC = Math.floor(tone * 0.96);
+            const bC = Math.floor(tone * 1.02); // subtle blue-gray tint
+
+            cCtx.fillStyle = `rgb(${rC},${gC},${bC})`;
+            cCtx.fillRect(bx + 2, by + 2, colW - 4, rowH - 4);
+
+            // Weathered pitting and mineral efflorescence
+            for (let p = 0; p < 30; p++) {
+              const px = Math.floor(bx + 3 + Math.random() * (colW - 6));
+              const py = Math.floor(by + 3 + Math.random() * (rowH - 6));
+              if (px >= 0 && px < size && py >= 0 && py < size) {
+                cCtx.fillStyle = Math.random() > 0.6 ? 'rgba(230,230,230,0.18)' : 'rgba(30,30,35,0.22)';
+                cCtx.fillRect(px, py, 2, 2);
+              }
+            }
+
+            // Fill height data: bricks protrude outward, mortar recesses
+            for (let y = Math.max(0, Math.floor(by)); y < Math.min(size, Math.floor(by + rowH)); y++) {
+              for (let x = Math.max(0, Math.floor(bx)); x < Math.min(size, Math.floor(bx + colW)); x++) {
+                const isBorder = (x <= bx + 2 || x >= bx + colW - 3 || y <= by + 2 || y >= by + rowH - 3);
+                const heightVal = isBorder ? 0.15 : (0.85 + (Math.random() * 0.12 - 0.06));
+                heightData[y * size + x] = heightVal;
+              }
+            }
+          }
+        }
+
+        // Mortar lines in heightmap
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.wrapS = THREE.RepeatWrapping;
+        colorTex.wrapT = THREE.RepeatWrapping;
+
+        const normalTex = this.generateNormalMap(heightData, size, size, 3.2);
+
+        return { map: colorTex, normalMap: normalTex };
+      }
+
+      // Foundation Ashlar Granite Blocks (Chiselled white-gray mountain granite)
+      static createGraniteAshlarPBR() {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const cCtx = colorCanvas.getContext('2d');
+
+        const heightData = new Float32Array(size * size);
+        const rows = 8;
+        const rowH = size / rows;
+        const cols = 4;
+        const colW = size / cols;
+
+        cCtx.fillStyle = '#4c4843';
+        cCtx.fillRect(0, 0, size, size);
+
+        for (let r = 0; r < rows; r++) {
+          const offset = (r % 2 === 1) ? colW / 2 : 0;
+          for (let c = -1; c <= cols + 1; c++) {
+            const bx = c * colW + offset;
+            const by = r * rowH;
+
+            // Massive cut stone slab: rough granite with mica speckles
+            const lum = 125 + Math.floor(Math.sin(r * 2.3 + c * 3.7) * 22) + (Math.random() * 16 - 8);
+            cCtx.fillStyle = `rgb(${lum},${lum - 2},${lum - 6})`;
+            cCtx.fillRect(bx + 3, by + 3, colW - 6, rowH - 6);
+
+            // Chisel marks & lichen patches
+            cCtx.fillStyle = 'rgba(78, 92, 60, 0.28)'; // Lichen
+            if (Math.random() < 0.35) {
+              cCtx.beginPath();
+              cCtx.arc(bx + colW/2, by + rowH/2, 16, 0, Math.PI * 2);
+              cCtx.fill();
+            }
+
+            for (let y = Math.max(0, Math.floor(by)); y < Math.min(size, Math.floor(by + rowH)); y++) {
+              for (let x = Math.max(0, Math.floor(bx)); x < Math.min(size, Math.floor(bx + colW)); x++) {
+                const edgeDistX = Math.min(x - bx, bx + colW - x);
+                const edgeDistY = Math.min(y - by, by + rowH - y);
+                const edgeDist = Math.min(edgeDistX, edgeDistY);
+                let h = edgeDist < 3 ? 0.1 : 0.88;
+                // Add granite surface grain
+                h += (Math.random() * 0.16 - 0.08);
+                heightData[y * size + x] = h;
+              }
+            }
+          }
+        }
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.wrapS = THREE.RepeatWrapping;
+        colorTex.wrapT = THREE.RepeatWrapping;
+
+        const normalTex = this.generateNormalMap(heightData, size, size, 4.0);
+
+        return { map: colorTex, normalMap: normalTex };
+      }
+
+      // Paved Rampart Walkway Flagstones (Worn central walking path)
+      static createWalkwayPBR() {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const cCtx = colorCanvas.getContext('2d');
+
+        const heightData = new Float32Array(size * size);
+        const grid = 32;
+
+        cCtx.fillStyle = '#55514b';
+        cCtx.fillRect(0, 0, size, size);
+
+        for (let x = 0; x < size; x += grid) {
+          for (let y = 0; y < size; y += grid) {
+            // Flagstone tile variance
+            const shade = 108 + Math.floor(Math.sin(x * 0.04 + y * 0.06) * 16) + (Math.random() * 12 - 6);
+            cCtx.fillStyle = `rgb(${shade},${shade - 3},${shade - 8})`;
+            cCtx.fillRect(x + 1, y + 1, grid - 2, grid - 2);
+
+            // Moss in flagstone crevices
+            if (Math.random() < 0.28) {
+              cCtx.fillStyle = 'rgba(68, 92, 50, 0.38)';
+              cCtx.fillRect(x + 2, y + 2, grid - 4, grid - 4);
+            }
+
+            for (let py = y; py < y + grid && py < size; py++) {
+              for (let px = x; px < x + grid && px < size; px++) {
+                const isBorder = (px === x || px === x + grid - 1 || py === y || py === y + grid - 1);
+                heightData[py * size + px] = isBorder ? 0.15 : (0.85 + (Math.random() * 0.1 - 0.05));
+              }
+            }
+          }
+        }
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.wrapS = THREE.RepeatWrapping;
+        colorTex.wrapT = THREE.RepeatWrapping;
+
+        const normalTex = this.generateNormalMap(heightData, size, size, 2.8);
+
+        return { map: colorTex, normalMap: normalTex };
+      }
+
+      // Mountain Karst Rock Texture (Sedimentary limestone strata and water wash)
+      static createKarstRockPBR() {
+        const size = 512;
+        const colorCanvas = document.createElement('canvas');
+        colorCanvas.width = size;
+        colorCanvas.height = size;
+        const cCtx = colorCanvas.getContext('2d');
+        const heightData = new Float32Array(size * size);
+
+        cCtx.fillStyle = '#5c544d';
+        cCtx.fillRect(0, 0, size, size);
+
+        // Horizontal sedimentary bedding layers
+        for (let y = 0; y < size; y++) {
+          const layer = Math.sin(y * 0.08) * 0.5 + Math.sin(y * 0.02) * 0.5;
+          const bandColor = Math.floor(85 + layer * 25);
+          cCtx.fillStyle = `rgba(${bandColor}, ${bandColor - 4}, ${bandColor - 8}, 0.5)`;
+          cCtx.fillRect(0, y, size, 1);
+        }
+
+        // Crags and vertical fissures
+        for (let i = 0; i < 40; i++) {
+          const fx = Math.random() * size;
+          cCtx.strokeStyle = 'rgba(25, 22, 18, 0.4)';
+          cCtx.lineWidth = 1 + Math.random() * 2;
+          cCtx.beginPath();
+          cCtx.moveTo(fx, 0);
+          cCtx.lineTo(fx + (Math.random() - 0.5) * 60, size);
+          cCtx.stroke();
+        }
+
+        // Build heightmap from canvas pixels
+        const imgData = cCtx.getImageData(0, 0, size, size).data;
+        for (let i = 0; i < size * size; i++) {
+          heightData[i] = (imgData[i * 4] / 255.0) + (Math.random() * 0.08 - 0.04);
+        }
+
+        const colorTex = new THREE.CanvasTexture(colorCanvas);
+        colorTex.wrapS = THREE.RepeatWrapping;
+        colorTex.wrapT = THREE.RepeatWrapping;
+
+        const normalTex = this.generateNormalMap(heightData, size, size, 3.5);
+
+        return { map: colorTex, normalMap: normalTex };
+      }
+
+      // Traditional Ming Ceramic Roof Tiles (筒瓦 / Curved charcoal tiles)
+      static createRoofTileTexture() {
+        const canvas = document.createElement('canvas');
+        canvas.width = 256;
+        canvas.height = 256;
+        const ctx = canvas.getContext('2d');
+
+        ctx.fillStyle = '#3a342f';
+        ctx.fillRect(0, 0, 256, 256);
+
+        const ribs = 16;
+        const ribW = 256 / ribs;
+        for (let i = 0; i < ribs; i++) {
+          const x = i * ribW;
+          const grad = ctx.createLinearGradient(x, 0, x + ribW, 0);
+          grad.addColorStop(0, '#1c1815');
+          grad.addColorStop(0.5, '#5c544d');
+          grad.addColorStop(1, '#1c1815');
+          ctx.fillStyle = grad;
+          ctx.fillRect(x, 0, ribW, 256);
+        }
+        const texture = new THREE.CanvasTexture(canvas);
+        texture.wrapS = THREE.RepeatWrapping;
+        texture.wrapT = THREE.RepeatWrapping;
+        return texture;
+      }
+    }
+
+    /* ==========================================================================
+       MAIN EXPERIENCE CONTROLLER
+       ========================================================================== */
+    class GreatWallExperience {
+      constructor() {
+        this.container = document.body;
+        this.canvas = document.getElementById('webgl-canvas');
+        this.noise = new FastNoise(42819);
+        this.audio = new AudioSystem();
+
+        this.scene = null;
+        this.camera = null;
+        this.renderer = null;
+        this.orbitControls = null;
+
+        // Spline, meshes & towers
+        this.wallCurve = null;
+        this.watchtowers = [];
+        this.wallMeshes = [];
+        this.drainGargoyles = [];
+        this.beaconFires = [];
+        this.beaconsIgnited = false;
+        this.beaconIgniteTimers = [];
+
+        // Modes: 'orbit', 'walk', 'tour'
+        this.cameraMode = 'orbit';
+        this.tourProgress = 0;
+        this.tourSpeed = 0.00035;
+
+        // First-person state
+        this.walkPos = new THREE.Vector3();
+        this.walkYaw = 0;
+        this.walkPitch = 0;
+        this.keys = {};
+        this.isPointerLocked = false;
+        this.walkStepTimer = 0;
+
+        // Atmosphere & Seasons
+        this.timeOfDay = 'sunset';
+        this.season = 'autumn';
+        this.lights = {};
+        this.treeInstances = [];
+        this.distantMountainMeshes = [];
+
+        // Animation clock
+        this.clock = new THREE.Clock();
+        this.frameCount = 0;
+        this.lastFpsUpdate = 0;
+
+        // Particles & birds
+        this.birds = [];
+        this.mistPlanes = [];
+
+        this.init();
+      }
+
+      updateLoader(percent, message) {
+        const pBar = document.getElementById('loader-progress');
+        const pMsg = document.getElementById('loader-msg');
+        if (pBar) pBar.style.width = percent + '%';
+        if (pMsg) pMsg.textContent = message;
+      }
+
+      hideLoader() {
+        const loader = document.getElementById('loader');
+        if (loader) {
+          loader.classList.add('hidden');
+          setTimeout(() => loader.remove(), 900);
+        }
+      }
+
+      init() {
+        this.updateLoader(10, "Initializing high-fidelity WebGL 2.0 PBR graphics engine...");
+        this.setupRenderer();
+        this.setupSceneAndCamera();
+
+        this.updateLoader(25, "Synthesizing high-resolution PBR stone & brick normal maps...");
+        this.setupPBRTextures();
+
+        this.updateLoader(45, "Carving Yan Mountain karst spine & razor-edge precipices...");
+        this.buildWallSpline();
+        this.buildTerrain();
+        this.buildDistantMountains();
+
+        this.updateLoader(70, "Laying granite ashlars, blue bricks, battlements & drainage spouts...");
+        this.buildGreatWall();
+        this.buildWatchtowers();
+
+        this.updateLoader(88, "Planting Chinese pines, seasonal foliage & mountain mist...");
+        this.populateVegetation();
+        this.createAtmosphereEffects();
+        this.createBirds();
+
+        this.setupEventListeners();
+        this.setSeason('autumn');
+        this.setTimeOfDay('sunset');
+
+        this.updateLoader(100, "The Great Wall stands ready.");
+        setTimeout(() => this.hideLoader(), 400);
+
+        this.animate();
+      }
+
+      setupRenderer() {
+        this.renderer = new THREE.WebGLRenderer({
+          canvas: this.canvas,
+          antialias: true,
+          powerPreference: "high-performance"
+        });
+        this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+        this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
+        this.renderer.toneMappingExposure = 1.1;
+        this.renderer.shadowMap.enabled = true;
+        this.renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+      }
+
+      setupSceneAndCamera() {
+        this.scene = new THREE.Scene();
+        this.scene.background = new THREE.Color(0x0e1726);
+
+        this.camera = new THREE.PerspectiveCamera(48, window.innerWidth / window.innerHeight, 0.5, 4500);
+        this.camera.position.set(160, 210, 260);
+
+        this.orbitControls = new THREE.OrbitControls(this.camera, this.renderer.domElement);
+        this.orbitControls.enableDamping = true;
+        this.orbitControls.dampingFactor = 0.05;
+        this.orbitControls.maxPolarAngle = Math.PI * 0.49;
+        this.orbitControls.minDistance = 5;
+        this.orbitControls.maxDistance = 1600;
+        this.orbitControls.target.set(0, 110, 0);
+
+        // Atmospheric Fog
+        this.fog = new THREE.FogExp2(0xbc674b, 0.0015);
+        this.scene.fog = this.fog;
+
+        // Primary Directional Sunlight with sharp cascades
+        const sun = new THREE.DirectionalLight(0xffeedd, 2.5);
+        sun.position.set(450, 480, 300);
+        sun.castShadow = true;
+        sun.shadow.mapSize.width = 2048;
+        sun.shadow.mapSize.height = 2048;
+        sun.shadow.camera.near = 50;
+        sun.shadow.camera.far = 1800;
+        const d = 520;
+        sun.shadow.camera.left = -d;
+        sun.shadow.camera.right = d;
+        sun.shadow.camera.top = d;
+        sun.shadow.camera.bottom = -d;
+        sun.shadow.bias = -0.0002;
+        this.scene.add(sun);
+        this.lights.sun = sun;
+
+        // Ambient Fill
+        const ambient = new THREE.AmbientLight(0x768ca0, 0.85);
+        this.scene.add(ambient);
+        this.lights.ambient = ambient;
+
+        // Hemisphere Sky/Ground
+        const hemi = new THREE.HemisphereLight(0xfff0e4, 0x3d4a36, 0.6);
+        this.scene.add(hemi);
+        this.lights.hemi = hemi;
+
+        // Celestial Sky Dome
+        const skyGeo = new THREE.SphereGeometry(2400, 32, 16);
+        const skyMat = new THREE.MeshBasicMaterial({
+          color: 0x243b55,
+          side: THREE.BackSide
+        });
+        this.skyDome = new THREE.Mesh(skyGeo, skyMat);
+        this.scene.add(this.skyDome);
+      }
+
+      setupPBRTextures() {
+        this.pbr = {
+          brick: TextureSynthesizer.createMingBrickPBR(),
+          ashlar: TextureSynthesizer.createGraniteAshlarPBR(),
+          walkway: TextureSynthesizer.createWalkwayPBR(),
+          rock: TextureSynthesizer.createKarstRockPBR(),
+          roof: TextureSynthesizer.createRoofTileTexture()
+        };
+
+        this.pbr.brick.map.repeat.set(2, 2);
+        this.pbr.brick.normalMap.repeat.set(2, 2);
+
+        this.pbr.ashlar.map.repeat.set(2, 1);
+        this.pbr.ashlar.normalMap.repeat.set(2, 1);
+
+        this.pbr.walkway.map.repeat.set(4, 4);
+        this.pbr.walkway.normalMap.repeat.set(4, 4);
+
+        this.pbr.rock.map.repeat.set(8, 8);
+        this.pbr.rock.normalMap.repeat.set(8, 8);
+      }
+
+      /* --------------------------------------------------------------------------
+         WALL SPLINE GEOMETRY
+         Winds along jagged razor-crests like Jiankou "Eagle Flies Facing Upward".
+         -------------------------------------------------------------------------- */
+      buildWallSpline() {
+        const rawPoints = [
+          new THREE.Vector3(-480, 0, -340),
+          new THREE.Vector3(-400, 0, -270),
+          new THREE.Vector3(-320, 0, -220),
+          new THREE.Vector3(-240, 0, -150),
+          new THREE.Vector3(-170, 0, -70),
+          new THREE.Vector3(-100, 0,  20),
+          new THREE.Vector3( -40, 0,  90),
+          new THREE.Vector3(  30, 0, 115),
+          new THREE.Vector3( 100, 0,  70),
+          new THREE.Vector3( 180, 0,  -5),
+          new THREE.Vector3( 260, 0, -75),
+          new THREE.Vector3( 330, 0, -120),
+          new THREE.Vector3( 410, 0, -160),
+          new THREE.Vector3( 500, 0, -200)
+        ];
+
+        rawPoints.forEach(pt => {
+          pt.y = this.getRawMountainHeight(pt.x, pt.z);
+        });
+
+        this.wallCurve = new THREE.CatmullRomCurve3(rawPoints, false, 'centripetal', 0.28);
+      }
+
+      /* --------------------------------------------------------------------------
+         PROCEDURAL YAN MOUNTAIN GEOLOGY
+         Knife-edge karst spines with 60-degree sheer cliffs and deep gorges.
+         -------------------------------------------------------------------------- */
+      getRawMountainHeight(x, z) {
+        // Distance to primary mountain backbone
+        const distFromAxis = Math.abs(z - (x * 0.44 + Math.sin(x * 0.007) * 95));
+
+        // Sharp knife-edge ridge profile
+        const ridgeProfile = Math.exp(-Math.pow(distFromAxis / 125, 2)) * 145;
+
+        // Geological karst strata & crags via domain-warped FBM
+        const karstOctave1 = this.noise.warpedFbm(x * 0.0026, z * 0.0026) * 110;
+        const cragOctave2  = this.noise.fbm(x * 0.009, z * 0.009, 3, 0.48, 2.2) * 36;
+        const microRoughness = this.noise.noise2D(x * 0.045, z * 0.045) * 5.0;
+
+        let totalH = 45 + ridgeProfile + karstOctave1 + cragOctave2 + microRoughness;
+        return Math.max(14, totalH);
+      }
+
+      getTerrainHeight(x, z) {
+        let h = this.getRawMountainHeight(x, z);
+
+        // Bedrock footing under the Wall: smooth foundation benching
+        if (this.wallCurve) {
+          const samples = 22;
+          let minSqDist = Infinity;
+          let wallPtY = 0;
+          for (let i = 0; i <= samples; i++) {
+            const p = this.wallCurve.getPoint(i / samples);
+            const sqDist = (p.x - x) * (p.x - x) + (p.z - z) * (p.z - z);
+            if (sqDist < minSqDist) {
+              minSqDist = sqDist;
+              wallPtY = p.y;
+            }
+          }
+          const dist = Math.sqrt(minSqDist);
+          if (dist < 14) {
+            const blend = 1.0 - (dist / 14);
+            h = THREE.MathUtils.lerp(h, wallPtY - 1.2, blend * 0.75);
+          }
+        }
+        return h;
+      }
+
+      buildTerrain() {
+        const size = 1400;
+        const segments = 220;
+        const terrainGeo = new THREE.PlaneGeometry(size, size, segments, segments);
+        terrainGeo.rotateX(-Math.PI / 2);
+
+        const pos = terrainGeo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const z = pos.getZ(i);
+          pos.setY(i, this.getTerrainHeight(x, z));
+        }
+        terrainGeo.computeVertexNormals();
+
+        // Calculate slope & height-based natural vertex coloration
+        const normals = terrainGeo.attributes.normal;
+        const vertexColors = [];
+        const cliffColor = new THREE.Color(0x645c55);  // Dolomite/limestone rock
+        const grassColor = new THREE.Color(0x566e3b);  // Northern alpine vegetation
+        const forestColor = new THREE.Color(0x2d4626); // Dense valley pine forest
+        const screeColor = new THREE.Color(0x7e766b);  // High gravel/scree peaks
+
+        for (let i = 0; i < pos.count; i++) {
+          const y = pos.getY(i);
+          const ny = normals.getY(i);
+
+          let c = new THREE.Color();
+          if (ny < 0.64) {
+            // Sheer cliff face: rock strata
+            c.copy(cliffColor).lerp(screeColor, (0.64 - ny) * 2.2);
+          } else {
+            // Gentler slope: seasonal grass or forest
+            if (y < 75) {
+              c.copy(forestColor);
+            } else if (y < 145) {
+              c.copy(grassColor).lerp(screeColor, (y - 75) / 70 * 0.35);
+            } else {
+              c.copy(screeColor).lerp(cliffColor, 0.4);
+            }
+          }
+
+          const noiseVal = (Math.sin(pos.getX(i) * 0.07) * Math.cos(pos.getZ(i) * 0.07)) * 0.05;
+          c.r += noiseVal;
+          c.g += noiseVal * 1.1;
+          c.b += noiseVal * 0.8;
+
+          vertexColors.push(c.r, c.g, c.b);
+        }
+        terrainGeo.setAttribute('color', new THREE.Float32BufferAttribute(vertexColors, 3));
+
+        const terrainMat = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.94,
+          metalness: 0.04,
+          normalMap: this.pbr.rock.normalMap,
+          normalScale: new THREE.Vector2(1.2, 1.2),
+          flatShading: false
+        });
+
+        const terrainMesh = new THREE.Mesh(terrainGeo, terrainMat);
+        terrainMesh.receiveShadow = true;
+        this.scene.add(terrainMesh);
+        this.terrainMesh = terrainMesh;
+      }
+
+      /* --------------------------------------------------------------------------
+         DISTANT MOUNTAIN SILHOUETTE LAYERS
+         Gives the iconic Chinese landscape painting (山水画) infinite sense of scale.
+         -------------------------------------------------------------------------- */
+      buildDistantMountains() {
+        const ringGeo = new THREE.RingGeometry(850, 1900, 64, 8);
+        ringGeo.rotateX(-Math.PI / 2);
+
+        const pos = ringGeo.attributes.position;
+        for (let i = 0; i < pos.count; i++) {
+          const x = pos.getX(i);
+          const z = pos.getZ(i);
+          const dist = Math.sqrt(x * x + z * z);
+          // Far mountain ridges
+          const ridge = this.noise.fbm(x * 0.0014, z * 0.0014, 4) * 260;
+          pos.setY(i, Math.max(0, ridge - 40));
+        }
+        ringGeo.computeVertexNormals();
+
+        const distMat = new THREE.MeshStandardMaterial({
+          color: 0x5a6878,
+          roughness: 1.0,
+          metalness: 0.0
+        });
+
+        const distMesh = new THREE.Mesh(ringGeo, distMat);
+        distMesh.position.y = -20;
+        this.scene.add(distMesh);
+        this.distantMountainMeshes.push(distMesh);
+      }
+
+      /* --------------------------------------------------------------------------
+         GREAT WALL ARCHITECTURE ENGINE
+         Features:
+         - Granite ashlar foundation plunging into bedrock
+         - Kiln-fired blue-gray brick curtain wall
+         - Exterior crenellated parapet with arrow loopholes
+         - Interior low smooth parapet (宇墙)
+         - Authentic stone steps on steep inclines
+         - Projecting stone drainage gargoyles (透水)
+         -------------------------------------------------------------------------- */
+      buildGreatWall() {
+        const numSteps = 600;
+        const wallWidth = 6.6;
+        const outerParapetH = 1.9; // Exterior duokou
+        const innerParapetH = 1.1; // Interior yuqiang
+        const parapetThick = 0.65;
+        const foundationDepth = 14.0;
+
+        const frames = [];
+        for (let i = 0; i <= numSteps; i++) {
+          const t = i / numSteps;
+          const pt = this.wallCurve.getPoint(t);
+          const tangent = this.wallCurve.getTangent(t).normalize();
+          const up = new THREE.Vector3(0, 1, 0);
+          const side = new THREE.Vector3().crossVectors(tangent, up).normalize();
+          const adjustedUp = new THREE.Vector3().crossVectors(side, tangent).normalize();
+
+          const groundY = this.getTerrainHeight(pt.x, pt.z);
+          pt.y = Math.max(pt.y, groundY + 1.2);
+
+          // Slope calculation for authentic stair step generation
+          const slope = Math.abs(tangent.y);
+          const isSteep = (slope > 0.18); // Heavenly stairs at Jiankou
+
+          frames.push({ pt, tangent, side, up: adjustedUp, groundY, t, slope, isSteep });
+        }
+
+        // 1. Walkway Surface (Flagstone pavement + steps)
+        const walkwayPositions = [];
+        const walkwayUvs = [];
+        const walkwayIndices = [];
+
+        for (let i = 0; i < frames.length; i++) {
+          const f = frames[i];
+          const leftP = f.pt.clone().addScaledVector(f.side, -wallWidth / 2);
+          const rightP = f.pt.clone().addScaledVector(f.side, wallWidth / 2);
+
+          walkwayPositions.push(leftP.x, leftP.y, leftP.z);
+          walkwayPositions.push(rightP.x, rightP.y, rightP.z);
+
+          walkwayUvs.push(0, i * 0.4);
+          walkwayUvs.push(1, i * 0.4);
+
+          if (i < frames.length - 1) {
+            const r1 = i * 2;
+            const r2 = (i + 1) * 2;
+            walkwayIndices.push(r1, r1 + 1, r2);
+            walkwayIndices.push(r1 + 1, r2 + 1, r2);
+          }
+        }
+
+        const walkwayGeo = new THREE.BufferGeometry();
+        walkwayGeo.setAttribute('position', new THREE.Float32BufferAttribute(walkwayPositions, 3));
+        walkwayGeo.setAttribute('uv', new THREE.Float32BufferAttribute(walkwayUvs, 2));
+        walkwayGeo.setIndex(walkwayIndices);
+        walkwayGeo.computeVertexNormals();
+
+        const walkwayMat = new THREE.MeshStandardMaterial({
+          map: this.pbr.walkway.map,
+          normalMap: this.pbr.walkway.normalMap,
+          normalScale: new THREE.Vector2(1.2, 1.2),
+          roughness: 0.86,
+          metalness: 0.05
+        });
+        const walkwayMesh = new THREE.Mesh(walkwayGeo, walkwayMat);
+        walkwayMesh.castShadow = true;
+        walkwayMesh.receiveShadow = true;
+        this.scene.add(walkwayMesh);
+        this.wallMeshes.push(walkwayMesh);
+
+        // 2. Foundation Ashlar Base (Granite blocks embedded into mountain rock)
+        const basePositions = [];
+        const baseUvs = [];
+        const baseIndices = [];
+        let bOffset = 0;
+
+        for (let i = 0; i < frames.length - 1; i++) {
+          const f0 = frames[i];
+          const f1 = frames[i + 1];
+
+          // Outer (left) foundation
+          const lTop0 = f0.pt.clone().addScaledVector(f0.side, -wallWidth / 2);
+          const lTop1 = f1.pt.clone().addScaledVector(f1.side, -wallWidth / 2);
+          const lBot0 = lTop0.clone(); lBot0.y = Math.min(lBot0.y - 2, f0.groundY - foundationDepth);
+          const lBot1 = lTop1.clone(); lBot1.y = Math.min(lBot1.y - 2, f1.groundY - foundationDepth);
+
+          basePositions.push(lTop0.x, lTop0.y, lTop0.z,  lTop1.x, lTop1.y, lTop1.z,  lBot1.x, lBot1.y, lBot1.z,  lBot0.x, lBot0.y, lBot0.z);
+          baseUvs.push(0, 1,  1, 1,  1, 0,  0, 0);
+          baseIndices.push(bOffset, bOffset + 1, bOffset + 2,  bOffset, bOffset + 2, bOffset + 3);
+          bOffset += 4;
+
+          // Inner (right) foundation
+          const rTop0 = f0.pt.clone().addScaledVector(f0.side, wallWidth / 2);
+          const rTop1 = f1.pt.clone().addScaledVector(f1.side, wallWidth / 2);
+          const rBot0 = rTop0.clone(); rBot0.y = Math.min(rBot0.y - 2, f0.groundY - foundationDepth);
+          const rBot1 = rTop1.clone(); rBot1.y = Math.min(rBot1.y - 2, f1.groundY - foundationDepth);
+
+          basePositions.push(rTop0.x, rTop0.y, rTop0.z,  rBot0.x, rBot0.y, rBot0.z,  rBot1.x, rBot1.y, rBot1.z,  rTop1.x, rTop1.y, rTop1.z);
+          baseUvs.push(0, 1,  0, 0,  1, 0,  1, 1);
+          baseIndices.push(bOffset, bOffset + 1, bOffset + 2,  bOffset, bOffset + 2, bOffset + 3);
+          bOffset += 4;
+        }
+
+        const baseGeo = new THREE.BufferGeometry();
+        baseGeo.setAttribute('position', new THREE.Float32BufferAttribute(basePositions, 3));
+        baseGeo.setAttribute('uv', new THREE.Float32BufferAttribute(baseUvs, 2));
+        baseGeo.setIndex(baseIndices);
+        baseGeo.computeVertexNormals();
+
+        const baseMat = new THREE.MeshStandardMaterial({
+          map: this.pbr.ashlar.map,
+          normalMap: this.pbr.ashlar.normalMap,
+          normalScale: new THREE.Vector2(1.5, 1.5),
+          roughness: 0.88,
+          metalness: 0.06
+        });
+        const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+        baseMesh.castShadow = true;
+        baseMesh.receiveShadow = true;
+        this.scene.add(baseMesh);
+        this.wallMeshes.push(baseMesh);
+
+        // 3. Parapets, Crenellations with Arrow Slits, and Stone Drainage Gargoyles (透水)
+        this.buildParapetsAndEmbrasures(frames, wallWidth, outerParapetH, innerParapetH, parapetThick);
+      }
+
+      buildParapetsAndEmbrasures(frames, wallWidth, outerParapetH, innerParapetH, parapetThick) {
+        const brickMat = new THREE.MeshStandardMaterial({
+          map: this.pbr.brick.map,
+          normalMap: this.pbr.brick.normalMap,
+          normalScale: new THREE.Vector2(1.3, 1.3),
+          roughness: 0.84,
+          metalness: 0.08
+        });
+
+        // Outer Merlons with authentic center arrow loops
+        const merlonGeo = new THREE.BoxGeometry(parapetThick, outerParapetH, 2.2);
+        const embrasureGeo = new THREE.BoxGeometry(parapetThick, outerParapetH * 0.52, 2.2);
+        const innerWallGeo = new THREE.BoxGeometry(parapetThick, innerParapetH, 2.2);
+
+        const outerMerlons = new THREE.InstancedMesh(merlonGeo, brickMat, frames.length);
+        const outerEmbrasures = new THREE.InstancedMesh(embrasureGeo, brickMat, frames.length);
+        const innerWalls = new THREE.InstancedMesh(innerWallGeo, brickMat, frames.length);
+
+        outerMerlons.castShadow = true; outerMerlons.receiveShadow = true;
+        outerEmbrasures.castShadow = true; outerEmbrasures.receiveShadow = true;
+        innerWalls.castShadow = true; innerWalls.receiveShadow = true;
+
+        // Dark recessed arrow slits (射孔) centered on each merlon
+        const loopGeo = new THREE.BoxGeometry(parapetThick + 0.1, 0.48, 0.26);
+        const loopMat = new THREE.MeshBasicMaterial({ color: 0x111317 });
+        const arrowLoops = new THREE.InstancedMesh(loopGeo, loopMat, frames.length);
+
+        // Stone stair steps (阶梯 / Heavenly Stairs) across walkway on steep inclines
+        const stepGeo = new THREE.BoxGeometry(0.35, 0.22, wallWidth - parapetThick * 2);
+        const stepMat = new THREE.MeshStandardMaterial({
+          map: this.pbr.ashlar.map,
+          normalMap: this.pbr.ashlar.normalMap,
+          roughness: 0.88
+        });
+        const stoneSteps = new THREE.InstancedMesh(stepGeo, stepMat, frames.length);
+        stoneSteps.castShadow = true;
+        stoneSteps.receiveShadow = true;
+
+        // Drainage gargoyles (透水) - allocate with safety margin
+        const maxSpouts = Math.ceil(frames.length / 8) + 32;
+        const spoutGeo = new THREE.BoxGeometry(0.35, 0.25, 0.8);
+        const spoutMat = new THREE.MeshStandardMaterial({
+          map: this.pbr.ashlar.map,
+          normalMap: this.pbr.ashlar.normalMap,
+          roughness: 0.9
+        });
+        const spouts = new THREE.InstancedMesh(spoutGeo, spoutMat, maxSpouts);
+        spouts.castShadow = true;
+
+        const dummy = new THREE.Object3D();
+        let mIdx = 0, eIdx = 0, iIdx = 0, sIdx = 0, loopIdx = 0, stepIdx = 0;
+
+        for (let i = 0; i < frames.length; i += 2) {
+          const f = frames[i];
+          const isMerlon = (Math.floor(i / 2) % 2 === 0);
+
+          // Outer Parapet (Left side - facing barbarian steppe)
+          const leftP = f.pt.clone().addScaledVector(f.side, -wallWidth / 2 + parapetThick / 2);
+          if (isMerlon) {
+            leftP.y += outerParapetH / 2;
+            dummy.position.copy(leftP);
+            dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), f.tangent);
+            dummy.updateMatrix();
+            outerMerlons.setMatrixAt(mIdx++, dummy.matrix);
+
+            // Centered arrow loophole through the merlon
+            dummy.position.copy(leftP);
+            dummy.updateMatrix();
+            arrowLoops.setMatrixAt(loopIdx++, dummy.matrix);
+          } else {
+            leftP.y += (outerParapetH * 0.52) / 2;
+            dummy.position.copy(leftP);
+            dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), f.tangent);
+            dummy.updateMatrix();
+            outerEmbrasures.setMatrixAt(eIdx++, dummy.matrix);
+          }
+
+          // Inner Parapet (Right side - facing interior valley; low & smooth Yuqiang)
+          const rightP = f.pt.clone().addScaledVector(f.side, wallWidth / 2 - parapetThick / 2);
+          rightP.y += innerParapetH / 2;
+          dummy.position.copy(rightP);
+          dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), f.tangent);
+          dummy.updateMatrix();
+          innerWalls.setMatrixAt(iIdx++, dummy.matrix);
+
+          // Stone stair riser on steep incline sections (Heavenly Stairs)
+          if (f.isSteep) {
+            const stepP = f.pt.clone();
+            stepP.y += 0.11;
+            dummy.position.copy(stepP);
+            dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), f.side);
+            dummy.updateMatrix();
+            stoneSteps.setMatrixAt(stepIdx++, dummy.matrix);
+          }
+
+          // Drainage spout every ~8 segments
+          if (i % 8 === 0) {
+            const spoutP = f.pt.clone().addScaledVector(f.side, -wallWidth / 2 - 0.25);
+            spoutP.y += 0.2;
+            dummy.position.copy(spoutP);
+            dummy.quaternion.setFromUnitVectors(new THREE.Vector3(0, 0, 1), f.side.clone().negate());
+            dummy.updateMatrix();
+            spouts.setMatrixAt(sIdx++, dummy.matrix);
+          }
+        }
+
+        outerMerlons.count = mIdx; outerMerlons.instanceMatrix.needsUpdate = true;
+        outerEmbrasures.count = eIdx; outerEmbrasures.instanceMatrix.needsUpdate = true;
+        innerWalls.count = iIdx; innerWalls.instanceMatrix.needsUpdate = true;
+        arrowLoops.count = loopIdx; arrowLoops.instanceMatrix.needsUpdate = true;
+        stoneSteps.count = stepIdx; stoneSteps.instanceMatrix.needsUpdate = true;
+        spouts.count = sIdx; spouts.instanceMatrix.needsUpdate = true;
+
+        this.scene.add(outerMerlons);
+        this.scene.add(outerEmbrasures);
+        this.scene.add(innerWalls);
+        this.scene.add(arrowLoops);
+        this.scene.add(stoneSteps);
+        this.scene.add(spouts);
+      }
+
+      /* --------------------------------------------------------------------------
+         AUTHENTIC MING WATCHTOWERS (敌楼 / Dilou)
+         Hollow brick-and-stone bastions with arched barrel vaults, radiating
+         stone voussoir windows, upper battlements, and iron beacon cauldrons.
+         -------------------------------------------------------------------------- */
+      buildWatchtowers() {
+        const towerSplineT = [0.08, 0.22, 0.36, 0.50, 0.65, 0.80, 0.94];
+        const towerNames = [
+          "I. Western Bastion Pass (西隘口)",
+          "II. Dragon Ridge Watchpost (龙脊台)",
+          "III. Thousand-Paces Sentry (千步楼)",
+          "IV. Mutianyu Grand Citadel (慕田峪关)",
+          "V. Eagle-Claw Sentry (鹰爪楼)",
+          "VI. Northern Cliff Outpost (北壁楼)",
+          "VII. Eastern Beacon Summit (东烽顶)"
+        ];
+
+        towerSplineT.forEach((t, i) => {
+          const center = this.wallCurve.getPoint(t);
+          const tangent = this.wallCurve.getTangent(t).normalize();
+          const towerGroup = new THREE.Group();
+          towerGroup.position.copy(center);
+
+          const rotMatrix = new THREE.Matrix4().lookAt(new THREE.Vector3(0,0,0), tangent, new THREE.Vector3(0,1,0));
+          towerGroup.quaternion.setFromRotationMatrix(rotMatrix);
+
+          // 1. Massive Battered Fortress Base
+          const baseW = 14;
+          const baseH = 14;
+          const baseGeo = new THREE.BoxGeometry(baseW, baseH, baseW);
+          const baseMat = new THREE.MeshStandardMaterial({
+            map: this.pbr.ashlar.map,
+            normalMap: this.pbr.ashlar.normalMap,
+            normalScale: new THREE.Vector2(1.4, 1.4),
+            roughness: 0.86
+          });
+          const baseMesh = new THREE.Mesh(baseGeo, baseMat);
+          baseMesh.position.y = baseH / 2 - 2;
+          baseMesh.castShadow = true;
+          baseMesh.receiveShadow = true;
+          towerGroup.add(baseMesh);
+
+          // 2. Kiln Brick Upper Fortress Chamber
+          const upperW = baseW - 0.4;
+          const upperH = 7.0;
+          const upperGeo = new THREE.BoxGeometry(upperW, upperH, upperW);
+          const upperMat = new THREE.MeshStandardMaterial({
+            map: this.pbr.brick.map,
+            normalMap: this.pbr.brick.normalMap,
+            normalScale: new THREE.Vector2(1.3, 1.3),
+            roughness: 0.84
+          });
+          const upperMesh = new THREE.Mesh(upperGeo, upperMat);
+          upperMesh.position.y = baseH + upperH / 2 - 2;
+          upperMesh.castShadow = true;
+          upperMesh.receiveShadow = true;
+          towerGroup.add(upperMesh);
+
+          // 3. Arched Ming Sentry Windows (Arrow ports / 三眼楼)
+          const archGeo = new THREE.CylinderGeometry(0.85, 0.85, 2.2, 12, 1, false, 0, Math.PI);
+          archGeo.rotateZ(Math.PI / 2);
+          const archMat = new THREE.MeshStandardMaterial({
+            color: 0x181a20,
+            roughness: 0.95
+          });
+
+          // Three arched arrow ports on each lateral wall
+          [-3.5, 0, 3.5].forEach(offset => {
+            const windowMeshL = new THREE.Mesh(archGeo, archMat);
+            windowMeshL.position.set(-baseW / 2 - 0.1, baseH + 2.0, offset);
+            windowMeshL.rotation.y = Math.PI / 2;
+            towerGroup.add(windowMeshL);
+
+            const windowMeshR = new THREE.Mesh(archGeo, archMat);
+            windowMeshR.position.set(baseW / 2 + 0.1, baseH + 2.0, offset);
+            windowMeshR.rotation.y = -Math.PI / 2;
+            towerGroup.add(windowMeshR);
+          });
+
+          // 4. Roof Terrace Pavilion with Curved Eaves (on major fortress towers)
+          const isMajorFort = (i === 3 || i === 0 || i === 6);
+          const terraceY = baseH + upperH - 2;
+          if (isMajorFort) {
+            const pavilionW = 7.6;
+            const pavilionH = 4.2;
+            const houseGeo = new THREE.BoxGeometry(pavilionW, pavilionH, pavilionW);
+            const houseMat = new THREE.MeshStandardMaterial({
+              color: 0x8a2325, // Traditional Ming cinnabar red lacquered wood
+              roughness: 0.65
+            });
+            const houseMesh = new THREE.Mesh(houseGeo, houseMat);
+            houseMesh.position.y = terraceY + pavilionH / 2;
+            houseMesh.castShadow = true;
+            towerGroup.add(houseMesh);
+
+            // Flared ceramic tile roof
+            const roofGeo = new THREE.ConeGeometry(pavilionW * 0.9, 3.4, 4);
+            roofGeo.rotateY(Math.PI / 4);
+            const roofMat = new THREE.MeshStandardMaterial({
+              map: this.pbr.roof,
+              roughness: 0.55
+            });
+            const roofMesh = new THREE.Mesh(roofGeo, roofMat);
+            roofMesh.position.y = terraceY + pavilionH + 1.7;
+            roofMesh.castShadow = true;
+            towerGroup.add(roofMesh);
+          }
+
+          // 5. Heavy Iron Beacon Cauldron / Brazier (烽火鼎)
+          const brazierGeo = new THREE.CylinderGeometry(1.3, 0.75, 1.8, 8);
+          const brazierMat = new THREE.MeshStandardMaterial({
+            color: 0x1f2326,
+            metalness: 0.85,
+            roughness: 0.35
+          });
+          const brazier = new THREE.Mesh(brazierGeo, brazierMat);
+          const brazierY = isMajorFort ? terraceY + 9.5 : terraceY + 0.9;
+          brazier.position.set(0, brazierY, 0);
+          towerGroup.add(brazier);
+
+          // 6. Beacon Signal Fire & Smoke System
+          const fireGroup = new THREE.Group();
+          fireGroup.position.set(0, brazierY + 1.2, 0);
+
+          const fireLight = new THREE.PointLight(0xff6600, 0, 50, 1.8);
+          fireLight.castShadow = true;
+          fireGroup.add(fireLight);
+
+          const flameGeo = new THREE.SphereGeometry(1.1, 8, 8);
+          const flameMat = new THREE.MeshBasicMaterial({
+            color: 0xff7700,
+            transparent: true,
+            opacity: 0
+          });
+          const flameMesh = new THREE.Mesh(flameGeo, flameMat);
+          fireGroup.add(flameMesh);
+
+          // Smoke particles
+          const smokeParticles = [];
+          const smokeGeo = new THREE.DodecahedronGeometry(0.9);
+          const smokeMat = new THREE.MeshBasicMaterial({
+            color: 0x2b2b2b,
+            transparent: true,
+            opacity: 0
+          });
+          for (let s = 0; s < 14; s++) {
+            const sm = new THREE.Mesh(smokeGeo, smokeMat.clone());
+            sm.position.set(
+              (Math.random() - 0.5) * 1.5,
+              s * 1.3,
+              (Math.random() - 0.5) * 1.5
+            );
+            fireGroup.add(sm);
+            smokeParticles.push({
+              mesh: sm,
+              initialY: s * 1.3,
+              speed: 0.08 + Math.random() * 0.07,
+              drift: (Math.random() - 0.5) * 0.06
+            });
+          }
+
+          towerGroup.add(fireGroup);
+
+          // 7. Fluttering Ming Dragon Banner
+          const flagPole = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.09, 0.09, 8.0),
+            new THREE.MeshStandardMaterial({ color: 0x3e2723 })
+          );
+          flagPole.position.set(-baseW/2 + 1.2, terraceY + 3.5, -baseW/2 + 1.2);
+          towerGroup.add(flagPole);
+
+          const flagGeo = new THREE.PlaneGeometry(2.6, 1.5, 6, 4);
+          const flagMat = new THREE.MeshBasicMaterial({
+            color: 0xb71c1c, // Imperial crimson
+            side: THREE.DoubleSide
+          });
+          const flagMesh = new THREE.Mesh(flagGeo, flagMat);
+          flagMesh.position.set(-baseW/2 + 2.5, terraceY + 6.0, -baseW/2 + 1.2);
+          towerGroup.add(flagMesh);
+
+          this.scene.add(towerGroup);
+
+          const towerRecord = {
+            id: i,
+            name: towerNames[i],
+            worldPos: center.clone(),
+            t,
+            fireGroup,
+            fireLight,
+            flameMesh,
+            smokeParticles,
+            flagMesh,
+            isIgnited: false
+          };
+
+          this.watchtowers.push(towerRecord);
+          this.beaconFires.push(towerRecord);
+        });
+      }
+
+      /* --------------------------------------------------------------------------
+         NATURAL VEGETATION ENGINE (Chinese Pines & Seasonal Foliage)
+         -------------------------------------------------------------------------- */
+      populateVegetation() {
+        const treeCount = 2000;
+        
+        // Multi-tier Chinese Pine (Pinus tabuliformis / 油松) geometry
+        const trunkGeo = new THREE.CylinderGeometry(0.28, 0.55, 3.2, 5);
+        trunkGeo.translate(0, 1.6, 0);
+        // Set bark color
+        const trunkColors = [];
+        for (let i = 0; i < trunkGeo.attributes.position.count; i++) {
+          trunkColors.push(0.26, 0.18, 0.13); // Weathered pine bark
+        }
+        trunkGeo.setAttribute('color', new THREE.Float32BufferAttribute(trunkColors, 3));
+
+        // Lower foliage cone
+        const leaves1Geo = new THREE.ConeGeometry(2.8, 3.6, 5);
+        leaves1Geo.translate(0, 3.8, 0);
+        const l1Colors = [];
+        for (let i = 0; i < leaves1Geo.attributes.position.count; i++) {
+          l1Colors.push(0.16, 0.32, 0.18);
+        }
+        leaves1Geo.setAttribute('color', new THREE.Float32BufferAttribute(l1Colors, 3));
+
+        // Mid foliage cone
+        const leaves2Geo = new THREE.ConeGeometry(2.1, 3.2, 5);
+        leaves2Geo.translate(0, 5.6, 0);
+        const l2Colors = [];
+        for (let i = 0; i < leaves2Geo.attributes.position.count; i++) {
+          l2Colors.push(0.18, 0.36, 0.20);
+        }
+        leaves2Geo.setAttribute('color', new THREE.Float32BufferAttribute(l2Colors, 3));
+
+        // Top foliage cone
+        const leaves3Geo = new THREE.ConeGeometry(1.4, 2.6, 5);
+        leaves3Geo.translate(0, 7.2, 0);
+        const l3Colors = [];
+        for (let i = 0; i < leaves3Geo.attributes.position.count; i++) {
+          l3Colors.push(0.22, 0.42, 0.22);
+        }
+        leaves3Geo.setAttribute('color', new THREE.Float32BufferAttribute(l3Colors, 3));
+
+        // Merge tree parts into one high-performance geometry
+        const mergedTreeGeo = this.mergeGeometries([trunkGeo, leaves1Geo, leaves2Geo, leaves3Geo]);
+
+        this.treeMat = new THREE.MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.90,
+          metalness: 0.02
+        });
+
+        const instancedTrees = new THREE.InstancedMesh(mergedTreeGeo, this.treeMat, treeCount + 50);
+        instancedTrees.castShadow = true;
+        instancedTrees.receiveShadow = true;
+
+        const dummy = new THREE.Object3D();
+        let placed = 0;
+
+        for (let i = 0; i < treeCount * 3 && placed < treeCount; i++) {
+          const x = (Math.random() - 0.5) * 1250;
+          const z = (Math.random() - 0.5) * 1250;
+          const y = this.getTerrainHeight(x, z);
+
+          if (y < 25 || y > 155) continue;
+
+          // Clear Great Wall corridor
+          let tooClose = false;
+          for (let s = 0; s < 28; s++) {
+            const wpt = this.wallCurve.getPoint(s / 28);
+            const distSq = (wpt.x - x) * (wpt.x - x) + (wpt.z - z) * (wpt.z - z);
+            if (distSq < 260) {
+              tooClose = true;
+              break;
+            }
+          }
+          if (tooClose) continue;
+
+          dummy.position.set(x, y - 0.2, z);
+          const scale = 0.75 + Math.random() * 0.75;
+          dummy.scale.set(scale, scale * (0.9 + Math.random() * 0.35), scale);
+          dummy.rotation.y = Math.random() * Math.PI * 2;
+          dummy.rotation.z = (Math.random() - 0.5) * 0.15;
+          dummy.updateMatrix();
+
+          instancedTrees.setMatrixAt(placed++, dummy.matrix);
+        }
+
+        instancedTrees.count = placed;
+        instancedTrees.instanceMatrix.needsUpdate = true;
+        this.scene.add(instancedTrees);
+        this.treeInstances.push(instancedTrees);
+
+        // Scatter 600 weathered limestone crags & boulders across mountain slopes
+        const boulderCount = 650;
+        const rockGeo = new THREE.DodecahedronGeometry(1.8, 1);
+        const rockMat = new THREE.MeshStandardMaterial({
+          map: this.pbr.ashlar.map,
+          normalMap: this.pbr.ashlar.normalMap,
+          roughness: 0.94
+        });
+        const instancedRocks = new THREE.InstancedMesh(rockGeo, rockMat, boulderCount + 20);
+        instancedRocks.castShadow = true;
+        instancedRocks.receiveShadow = true;
+
+        let rPlaced = 0;
+        for (let i = 0; i < boulderCount * 2 && rPlaced < boulderCount; i++) {
+          const rx = (Math.random() - 0.5) * 1200;
+          const rz = (Math.random() - 0.5) * 1200;
+          const ry = this.getTerrainHeight(rx, rz);
+          if (ry < 30) continue;
+
+          dummy.position.set(rx, ry + 0.3, rz);
+          const rs = 0.6 + Math.random() * 1.6;
+          dummy.scale.set(rs * (0.8 + Math.random() * 0.4), rs * 0.65, rs * (0.8 + Math.random() * 0.4));
+          dummy.rotation.set(Math.random() * Math.PI, Math.random() * Math.PI, Math.random() * Math.PI);
+          dummy.updateMatrix();
+
+          instancedRocks.setMatrixAt(rPlaced++, dummy.matrix);
+        }
+        instancedRocks.count = rPlaced;
+        instancedRocks.instanceMatrix.needsUpdate = true;
+        this.scene.add(instancedRocks);
+      }
+
+      // Robust Geometry Merger for Vanilla Three.js
+      mergeGeometries(geos) {
+        let totalPos = 0, totalNorm = 0, totalColor = 0, totalIndex = 0;
+        geos.forEach(g => {
+          totalPos += g.attributes.position.array.length;
+          if (g.attributes.normal) totalNorm += g.attributes.normal.array.length;
+          if (g.attributes.color) totalColor += g.attributes.color.array.length;
+          if (g.index) totalIndex += g.index.array.length;
+        });
+
+        const merged = new THREE.BufferGeometry();
+        const posArr = new Float32Array(totalPos);
+        const normArr = totalNorm ? new Float32Array(totalNorm) : null;
+        const colArr = totalColor ? new Float32Array(totalColor) : null;
+        const idxArr = totalIndex ? new Uint32Array(totalIndex) : null;
+
+        let pOff = 0, nOff = 0, cOff = 0, iOff = 0, vOffset = 0;
+        geos.forEach(g => {
+          posArr.set(g.attributes.position.array, pOff);
+          pOff += g.attributes.position.array.length;
+
+          if (normArr && g.attributes.normal) {
+            normArr.set(g.attributes.normal.array, nOff);
+            nOff += g.attributes.normal.array.length;
+          }
+          if (colArr && g.attributes.color) {
+            colArr.set(g.attributes.color.array, cOff);
+            cOff += g.attributes.color.array.length;
+          }
+          if (idxArr && g.index) {
+            for (let k = 0; k < g.index.array.length; k++) {
+              idxArr[iOff + k] = g.index.array[k] + vOffset;
+            }
+            iOff += g.index.array.length;
+          }
+          vOffset += g.attributes.position.count;
+        });
+
+        merged.setAttribute('position', new THREE.BufferAttribute(posArr, 3));
+        if (normArr) merged.setAttribute('normal', new THREE.BufferAttribute(normArr, 3));
+        if (colArr) merged.setAttribute('color', new THREE.BufferAttribute(colArr, 3));
+        if (idxArr) merged.setIndex(new THREE.BufferAttribute(idxArr, 1));
+        return merged;
+      }
+
+      /* --------------------------------------------------------------------------
+         ATMOSPHERIC MOUNTAIN MIST
+         -------------------------------------------------------------------------- */
+      createAtmosphereEffects() {
+        const mistCount = 16;
+        const mistGeo = new THREE.PlaneGeometry(320, 200);
+        mistGeo.rotateX(-Math.PI / 2);
+
+        const mistMat = new THREE.MeshBasicMaterial({
+          color: 0xf5ede4,
+          transparent: true,
+          opacity: 0.18,
+          depthWrite: false,
+          side: THREE.DoubleSide
+        });
+
+        for (let i = 0; i < mistCount; i++) {
+          const mesh = new THREE.Mesh(mistGeo, mistMat.clone());
+          mesh.position.set(
+            (Math.random() - 0.5) * 1000,
+            26 + Math.random() * 50,
+            (Math.random() - 0.5) * 1000
+          );
+          mesh.rotation.y = Math.random() * Math.PI * 2;
+          this.scene.add(mesh);
+          this.mistPlanes.push({
+            mesh,
+            speedX: (Math.random() - 0.5) * 0.18,
+            speedZ: (Math.random() - 0.5) * 0.18
+          });
+        }
+      }
+
+      /* --------------------------------------------------------------------------
+         SOARING MOUNTAIN EAGLES & CRANES
+         -------------------------------------------------------------------------- */
+      createBirds() {
+        const birdGeo = new THREE.BufferGeometry();
+        const verts = new Float32Array([
+          -2.4, 0.4, 0.5,   0, 0, -1.1,   0, 0, 0,
+           2.4, 0.4, 0.5,   0, 0,  0,     0, 0, -1.1
+        ]);
+        birdGeo.setAttribute('position', new THREE.BufferAttribute(verts, 3));
+        birdGeo.computeVertexNormals();
+
+        const birdMat = new THREE.MeshBasicMaterial({
+          color: 0x151515,
+          side: THREE.DoubleSide
+        });
+
+        for (let i = 0; i < 18; i++) {
+          const mesh = new THREE.Mesh(birdGeo, birdMat);
+          const angle = (i / 18) * Math.PI * 2;
+          mesh.position.set(
+            Math.cos(angle) * 340,
+            170 + Math.random() * 65,
+            Math.sin(angle) * 340
+          );
+          this.scene.add(mesh);
+          this.birds.push({
+            mesh,
+            angle,
+            radius: 300 + Math.random() * 140,
+            speed: 0.003 + Math.random() * 0.002,
+            flapSpeed: 4.8 + Math.random() * 2.0,
+            baseY: mesh.position.y
+          });
+        }
+      }
+
+      /* --------------------------------------------------------------------------
+         SEASONAL BIOME SYSTEM
+         Switches foliage and ground palette between Jiankou Golden Autumn,
+         Lush Summer, Spring Mountain Blossom, and Winter Frost.
+         -------------------------------------------------------------------------- */
+      setSeason(season) {
+        this.season = season;
+        document.querySelectorAll('.controls-panel button[id^="btn-season-"]').forEach(b => b.classList.remove('active'));
+        const btn = document.getElementById(`btn-season-${season}`);
+        if (btn) btn.classList.add('active');
+
+        if (!this.treeMat) return;
+
+        switch (season) {
+          case 'autumn':
+            // Fiery Jiankou autumn (yellow ginkgo, amber maples & dark pines)
+            this.treeMat.color.setHex(0xe88a2a);
+            break;
+          case 'summer':
+            // Deep emerald conifer forest
+            this.treeMat.color.setHex(0xffffff);
+            break;
+          case 'spring':
+            // Wild mountain apricot & cherry blossoms along the ramparts
+            this.treeMat.color.setHex(0xe88da0);
+            break;
+          case 'winter':
+            // Frosted snow-dusted pines
+            this.treeMat.color.setHex(0xbad2e8);
+            break;
+        }
+      }
+
+      /* --------------------------------------------------------------------------
+         ATMOSPHERE & LIGHTING PRESETS
+         -------------------------------------------------------------------------- */
+      setTimeOfDay(mode) {
+        this.timeOfDay = mode;
+        const sun = this.lights.sun;
+        const ambient = this.lights.ambient;
+        const hemi = this.lights.hemi;
+
+        document.querySelectorAll('.controls-panel button[id^="btn-tod-"]').forEach(b => b.classList.remove('active'));
+        const activeBtn = document.getElementById(`btn-tod-${mode}`);
+        if (activeBtn) activeBtn.classList.add('active');
+
+        switch (mode) {
+          case 'sunset':
+            // Warm golden hour rim light over Yan mountain ridges
+            this.scene.background.setHex(0xb2593b);
+            this.fog.color.setHex(0xbc674b);
+            this.fog.density = 0.0016;
+            sun.position.set(450, 160, 260);
+            sun.color.setHex(0xffaa55);
+            sun.intensity = 2.6;
+            ambient.color.setHex(0x5a4843);
+            ambient.intensity = 0.8;
+            hemi.color.setHex(0xffc599);
+            hemi.groundColor.setHex(0x3e2b24);
+            break;
+
+          case 'noon':
+            // High sharp sun with blue mountain sky
+            this.scene.background.setHex(0x7bb5d8);
+            this.fog.color.setHex(0x9bc7e0);
+            this.fog.density = 0.0012;
+            sun.position.set(100, 600, 150);
+            sun.color.setHex(0xfffff0);
+            sun.intensity = 2.8;
+            ambient.color.setHex(0x8fa3b8);
+            ambient.intensity = 0.9;
+            hemi.color.setHex(0xdbeafe);
+            hemi.groundColor.setHex(0x3a4f32);
+            break;
+
+          case 'mist':
+            // Moody mountain fog curling through passes
+            this.scene.background.setHex(0x8b99a6);
+            this.fog.color.setHex(0x9aa8b5);
+            this.fog.density = 0.0038;
+            sun.position.set(150, 300, 150);
+            sun.color.setHex(0xd8e0e8);
+            sun.intensity = 1.4;
+            ambient.color.setHex(0x93a4b5);
+            ambient.intensity = 1.1;
+            hemi.color.setHex(0xcfdbe6);
+            hemi.groundColor.setHex(0x404b44);
+            break;
+
+          case 'night':
+            // Moonlit dynasty with starry stillness
+            this.scene.background.setHex(0x060c18);
+            this.fog.color.setHex(0x0a1426);
+            this.fog.density = 0.0020;
+            sun.position.set(-200, 350, -200);
+            sun.color.setHex(0x7a9fc7);
+            sun.intensity = 0.9;
+            ambient.color.setHex(0x192841);
+            ambient.intensity = 0.45;
+            hemi.color.setHex(0x27436b);
+            hemi.groundColor.setHex(0x0b131f);
+            break;
+        }
+      }
+
+      /* --------------------------------------------------------------------------
+         BEACON SIGNAL TELEGRAPH IGNITION CHAIN
+         -------------------------------------------------------------------------- */
+      triggerBeaconSequence() {
+        if (this.beaconsIgnited) {
+          this.beaconsIgnited = false;
+          this.beaconIgniteTimers.forEach(t => clearTimeout(t));
+          this.beaconIgniteTimers = [];
+
+          this.watchtowers.forEach(tw => {
+            tw.isIgnited = false;
+            tw.fireLight.intensity = 0;
+            tw.flameMesh.material.opacity = 0;
+            tw.smokeParticles.forEach(s => s.mesh.material.opacity = 0);
+          });
+
+          this.audio.setFireVolume(0);
+          document.getElementById('beacon-indicator').classList.remove('active');
+          document.getElementById('beacon-status-text').textContent = "Beacon Network: Standing Watch";
+          const btn = document.getElementById('btn-beacon-fire');
+          btn.textContent = "🔥 Light Beacon Fires";
+          btn.classList.remove('ignited');
+          return;
+        }
+
+        this.beaconsIgnited = true;
+        document.getElementById('beacon-indicator').classList.add('active');
+        document.getElementById('beacon-status-text').textContent = "TRANSMITTING ALARM: 7 Beacons Blazing";
+        const btn = document.getElementById('btn-beacon-fire');
+        btn.textContent = "💨 Extinguish Beacons";
+        btn.classList.add('ignited');
+
+        this.watchtowers.forEach((tw, index) => {
+          const timer = setTimeout(() => {
+            tw.isIgnited = true;
+            this.audio.playGong(160 + index * 25);
+            this.audio.setFireVolume(0.45);
+
+            if (index === 3) {
+              const poi = document.getElementById('poi-card');
+              document.getElementById('poi-title').textContent = tw.name;
+              document.getElementById('poi-desc').textContent =
+                "The signal torch has reached the central garrison fortress. In ancient times, a chain of 10 beacon towers could transmit military alarms over 200 miles across the mountains in under 15 minutes.";
+              poi.classList.add('visible');
+            }
+          }, index * 850);
+          this.beaconIgniteTimers.push(timer);
+        });
+      }
+
+      /* --------------------------------------------------------------------------
+         INPUT & INTERACTION CONTROLLER
+         -------------------------------------------------------------------------- */
+      setupEventListeners() {
+        window.addEventListener('resize', () => {
+          this.camera.aspect = window.innerWidth / window.innerHeight;
+          this.camera.updateProjectionMatrix();
+          this.renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+
+        document.addEventListener('keydown', (e) => {
+          this.keys[e.code] = true;
+          this.audio.init();
+
+          if (e.code === 'KeyB') {
+            this.triggerBeaconSequence();
+          }
+          if (e.code === 'Digit1') this.setCameraMode('orbit');
+          if (e.code === 'Digit2') this.setCameraMode('walk');
+          if (e.code === 'Digit3') this.setCameraMode('tour');
+        });
+        document.addEventListener('keyup', (e) => {
+          this.keys[e.code] = false;
+        });
+
+        document.addEventListener('mousemove', (e) => {
+          if (this.cameraMode === 'walk' && this.isPointerLocked) {
+            const sensitivity = 0.0024;
+            this.walkYaw -= e.movementX * sensitivity;
+            this.walkPitch -= e.movementY * sensitivity;
+            this.walkPitch = Math.max(-Math.PI * 0.45, Math.min(Math.PI * 0.45, this.walkPitch));
+          }
+        });
+
+        this.canvas.addEventListener('click', () => {
+          this.audio.init();
+          if (this.cameraMode === 'walk' && !this.isPointerLocked) {
+            this.canvas.requestPointerLock();
+          }
+        });
+
+        document.addEventListener('pointerlockchange', () => {
+          this.isPointerLocked = (document.pointerLockElement === this.canvas);
+        });
+
+        // UI Buttons
+        document.getElementById('btn-cam-orbit').addEventListener('click', () => this.setCameraMode('orbit'));
+        document.getElementById('btn-cam-walk').addEventListener('click', () => this.setCameraMode('walk'));
+        document.getElementById('btn-cam-tour').addEventListener('click', () => this.setCameraMode('tour'));
+        document.getElementById('btn-beacon-fire').addEventListener('click', () => {
+          this.audio.init();
+          this.triggerBeaconSequence();
+        });
+
+        document.getElementById('btn-tod-sunset').addEventListener('click', () => this.setTimeOfDay('sunset'));
+        document.getElementById('btn-tod-noon').addEventListener('click', () => this.setTimeOfDay('noon'));
+        document.getElementById('btn-tod-mist').addEventListener('click', () => this.setTimeOfDay('mist'));
+        document.getElementById('btn-tod-night').addEventListener('click', () => this.setTimeOfDay('night'));
+
+        document.getElementById('btn-season-autumn').addEventListener('click', () => this.setSeason('autumn'));
+        document.getElementById('btn-season-summer').addEventListener('click', () => this.setSeason('summer'));
+        document.getElementById('btn-season-spring').addEventListener('click', () => this.setSeason('spring'));
+        document.getElementById('btn-season-winter').addEventListener('click', () => this.setSeason('winter'));
+
+        document.getElementById('sound-btn').addEventListener('click', (e) => {
+          const muted = this.audio.toggleMute();
+          e.target.textContent = muted ? "🔇 Sound: Off" : "🔊 Sound: On";
+        });
+
+        document.getElementById('poi-close-btn').addEventListener('click', () => {
+          document.getElementById('poi-card').classList.remove('visible');
+        });
+      }
+
+      setCameraMode(mode) {
+        this.cameraMode = mode;
+        document.body.classList.toggle('cinematic', mode === 'tour');
+
+        document.getElementById('btn-cam-orbit').classList.toggle('active', mode === 'orbit');
+        document.getElementById('btn-cam-walk').classList.toggle('active', mode === 'walk');
+        document.getElementById('btn-cam-tour').classList.toggle('active', mode === 'tour');
+
+        const reticle = document.getElementById('reticle');
+        const walkHint = document.getElementById('walk-hint');
+
+        if (mode === 'orbit') {
+          this.orbitControls.enabled = true;
+          reticle.style.display = 'none';
+          walkHint.style.display = 'none';
+          if (document.exitPointerLock) document.exitPointerLock();
+        } else if (mode === 'walk') {
+          this.orbitControls.enabled = false;
+          reticle.style.display = 'block';
+          walkHint.style.display = 'block';
+
+          // Spawn on walkway at Watchtower IV (Citadel pass)
+          const spawnPt = this.wallCurve.getPoint(0.50);
+          this.walkPos.copy(spawnPt);
+          this.walkPos.y += 2.4;
+          this.camera.position.copy(this.walkPos);
+          this.walkYaw = Math.PI * 0.45;
+          this.walkPitch = 0;
+          this.canvas.requestPointerLock();
+        } else if (mode === 'tour') {
+          this.orbitControls.enabled = false;
+          reticle.style.display = 'none';
+          walkHint.style.display = 'none';
+          if (document.exitPointerLock) document.exitPointerLock();
+        }
+      }
+
+      /* --------------------------------------------------------------------------
+         MAIN RENDER & ANIMATION LOOP
+         -------------------------------------------------------------------------- */
+      animate() {
+        requestAnimationFrame(() => this.animate());
+
+        const delta = Math.min(this.clock.getDelta(), 0.1);
+        const time = this.clock.getElapsedTime();
+
+        if (this.cameraMode === 'orbit') {
+          this.orbitControls.update();
+        } else if (this.cameraMode === 'walk') {
+          this.updateWalkMode(delta);
+        } else if (this.cameraMode === 'tour') {
+          this.updateTourMode(delta);
+        }
+
+        this.updateBeaconFires(time);
+
+        // Fluttering Ming Battle Banners
+        this.watchtowers.forEach(tw => {
+          if (tw.flagMesh) {
+            const pos = tw.flagMesh.geometry.attributes.position;
+            for (let i = 0; i < pos.count; i++) {
+              const u = pos.getX(i);
+              const wave = Math.sin(time * 5.2 + u * 3.2) * (u * 0.15);
+              pos.setZ(i, wave);
+            }
+            pos.needsUpdate = true;
+          }
+        });
+
+        // Drifting Valley Mist
+        this.mistPlanes.forEach(m => {
+          m.mesh.position.x += m.speedX;
+          m.mesh.position.z += m.speedZ;
+          if (m.mesh.position.x > 550) m.mesh.position.x = -550;
+          if (m.mesh.position.x < -550) m.mesh.position.x = 550;
+          if (m.mesh.position.z > 550) m.mesh.position.z = -550;
+          if (m.mesh.position.z < -550) m.mesh.position.z = 550;
+        });
+
+        // Soaring Birds
+        this.birds.forEach(b => {
+          b.angle += b.speed;
+          b.mesh.position.x = Math.cos(b.angle) * b.radius;
+          b.mesh.position.z = Math.sin(b.angle) * b.radius;
+          b.mesh.position.y = b.baseY + Math.sin(time * 1.5 + b.angle) * 8.0;
+          b.mesh.rotation.y = -b.angle + Math.PI / 2;
+          b.mesh.rotation.z = Math.sin(time * b.flapSpeed) * 0.35;
+        });
+
+        // Telemetry
+        this.frameCount++;
+        if (time - this.lastFpsUpdate > 0.5) {
+          const fps = Math.round(this.frameCount / (time - this.lastFpsUpdate));
+          document.getElementById('fps-display').textContent = `${fps} FPS • PBR Normal Maps`;
+          this.frameCount = 0;
+          this.lastFpsUpdate = time;
+        }
+
+        this.renderer.render(this.scene, this.camera);
+      }
+
+      updateWalkMode(delta) {
+        const moveSpeed = (this.keys['ShiftLeft'] || this.keys['ShiftRight']) ? 14.0 : 7.0;
+        const forward = new THREE.Vector3(-Math.sin(this.walkYaw), 0, -Math.cos(this.walkYaw));
+        const strafe = new THREE.Vector3(Math.cos(this.walkYaw), 0, -Math.sin(this.walkYaw));
+
+        let isMoving = false;
+        if (this.keys['KeyW'] || this.keys['ArrowUp']) { this.walkPos.addScaledVector(forward, moveSpeed * delta); isMoving = true; }
+        if (this.keys['KeyS'] || this.keys['ArrowDown']) { this.walkPos.addScaledVector(forward, -moveSpeed * delta); isMoving = true; }
+        if (this.keys['KeyA'] || this.keys['ArrowLeft']) { this.walkPos.addScaledVector(strafe, -moveSpeed * delta); isMoving = true; }
+        if (this.keys['KeyD'] || this.keys['ArrowRight']) { this.walkPos.addScaledVector(strafe, moveSpeed * delta); isMoving = true; }
+
+        if (isMoving) {
+          this.walkStepTimer += delta * (moveSpeed / 7.0);
+          if (this.walkStepTimer > 0.55) {
+            this.audio.playStep();
+            this.walkStepTimer = 0;
+          }
+        }
+
+        let minSqDist = Infinity;
+        let closestT = 0;
+        let closestPt = null;
+        const samples = 140;
+        for (let i = 0; i <= samples; i++) {
+          const t = i / samples;
+          const p = this.wallCurve.getPoint(t);
+          const sqDist = (p.x - this.walkPos.x) * (p.x - this.walkPos.x) + (p.z - this.walkPos.z) * (p.z - this.walkPos.z);
+          if (sqDist < minSqDist) {
+            minSqDist = sqDist;
+            closestT = t;
+            closestPt = p;
+          }
+        }
+
+        const distFromSpine = Math.sqrt(minSqDist);
+        if (distFromSpine > 2.8) {
+          const toSpine = new THREE.Vector3().subVectors(closestPt, this.walkPos);
+          toSpine.y = 0;
+          this.walkPos.addScaledVector(toSpine, 0.25);
+        }
+
+        const wallH = closestPt ? closestPt.y : this.getTerrainHeight(this.walkPos.x, this.walkPos.z);
+        this.walkPos.y = THREE.MathUtils.lerp(this.walkPos.y, wallH + 2.2, 0.2);
+
+        this.camera.position.copy(this.walkPos);
+        const lookDir = new THREE.Vector3(
+          -Math.sin(this.walkYaw) * Math.cos(this.walkPitch),
+          Math.sin(this.walkPitch),
+          -Math.cos(this.walkYaw) * Math.cos(this.walkPitch)
+        );
+        this.camera.lookAt(this.walkPos.clone().add(lookDir));
+
+        this.updateProgressUI(closestT);
+      }
+
+      updateTourMode(delta) {
+        this.tourProgress = (this.tourProgress + this.tourSpeed * (delta * 60)) % 1.0;
+
+        const currentT = this.tourProgress;
+        const lookT = (this.tourProgress + 0.04) % 1.0;
+
+        const wallPt = this.wallCurve.getPoint(currentT);
+        const lookPt = this.wallCurve.getPoint(lookT);
+        const tangent = this.wallCurve.getTangent(currentT);
+        const side = new THREE.Vector3(0, 1, 0).cross(tangent).normalize();
+
+        const camOffset = side.clone().multiplyScalar(22).add(new THREE.Vector3(0, 18, 0));
+        const targetCamPos = wallPt.clone().add(camOffset);
+
+        this.camera.position.lerp(targetCamPos, 0.08);
+        this.camera.lookAt(lookPt.clone().add(new THREE.Vector3(0, 4, 0)));
+
+        this.updateProgressUI(currentT);
+      }
+
+      updateProgressUI(t) {
+        const pct = Math.floor(t * 100);
+        const fill = document.getElementById('wall-tour-progress');
+        const label = document.getElementById('progress-percent');
+        if (fill) fill.style.width = pct + '%';
+        if (label) label.textContent = pct + '%';
+      }
+
+      updateBeaconFires(time) {
+        this.watchtowers.forEach(tw => {
+          if (!tw.isIgnited) return;
+
+          const flicker = 0.8 + Math.sin(time * 18.0 + tw.id * 3.0) * 0.2 + (Math.random() - 0.5) * 0.15;
+          tw.fireLight.intensity = 2.4 * flicker;
+          tw.flameMesh.material.opacity = 0.95;
+          tw.flameMesh.scale.set(
+            1.0 + Math.sin(time * 12.0) * 0.15,
+            1.4 + Math.cos(time * 14.0) * 0.35,
+            1.0 + Math.cos(time * 12.0) * 0.15
+          );
+
+          tw.smokeParticles.forEach(sp => {
+            sp.mesh.material.opacity = Math.max(0, 0.45 - (sp.mesh.position.y / 24));
+            sp.mesh.position.y += sp.speed;
+            sp.mesh.position.x += sp.drift;
+            const s = 1.0 + (sp.mesh.position.y * 0.14);
+            sp.mesh.scale.set(s, s, s);
+
+            if (sp.mesh.position.y > 22.0) {
+              sp.mesh.position.y = 0;
+              sp.mesh.position.x = (Math.random() - 0.5) * 1.5;
+              sp.mesh.position.z = (Math.random() - 0.5) * 1.5;
+            }
+          });
+        });
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', () => {
+      new GreatWallExperience();
+    });
+  </script>
+</body>
+</html>
